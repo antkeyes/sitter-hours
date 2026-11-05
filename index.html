@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Sitter Hours">
+<meta name="theme-color" content="#FFF7F2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1C1816" media="(prefers-color-scheme: dark)">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Sitter Hours</title>
+<style>
+  :root {
+    --bg: #FFF7F2;
+    --card: #FFFFFF;
+    --ink: #2B2522;
+    --muted: #8C817A;
+    --line: #F1E6DE;
+    --soft: #FCEEE7;
+    --green: #22A86E;
+    --green-dark: #198A59;
+    --green-soft: #DFF5EA;
+    --coral: #F0645A;
+    --coral-dark: #D44C42;
+    --gold: #FFF3D1;
+    --shadow: 0 6px 24px rgba(120, 70, 40, .10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1C1816;
+      --card: #2A2421;
+      --ink: #F6EEE9;
+      --muted: #A99D96;
+      --line: #3A322E;
+      --soft: #352C28;
+      --green-soft: #1F3A2D;
+      --gold: #3D3423;
+      --shadow: 0 6px 24px rgba(0, 0, 0, .35);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-user-select: none; user-select: none;
+    min-height: 100vh;
+  }
+  button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+  [hidden] { display: none !important; }
+
+  .wrap {
+    max-width: 480px; margin: 0 auto;
+    padding: calc(env(safe-area-inset-top) + 14px) 18px calc(env(safe-area-inset-bottom) + 28px);
+  }
+
+  /* Header */
+  header { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; }
+  header .titles { flex: 1; min-width: 0; }
+  .hello { font-size: 26px; font-weight: 700; letter-spacing: -.3px; }
+  .today { color: var(--muted); font-size: 15px; margin-top: 2px; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 50%; flex: none;
+    display: grid; place-items: center; color: var(--muted);
+  }
+  .icon-btn:active { background: var(--soft); }
+  .icon-btn svg { width: 22px; height: 22px; }
+  .spin svg { animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Clock card */
+  .clock-card {
+    background: var(--card); border-radius: 28px; box-shadow: var(--shadow);
+    padding: 22px 20px 24px; text-align: center;
+  }
+  .status { font-size: 17px; font-weight: 600; color: var(--muted); }
+  .status.on { color: var(--green); }
+  .dot {
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--green); margin-right: 7px; vertical-align: 1px;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .timer {
+    font-size: 46px; font-weight: 700; letter-spacing: -1px; margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .big-btn {
+    width: 190px; height: 190px; border-radius: 50%;
+    margin: 18px auto 6px; display: grid; place-items: center; align-content: center; gap: 6px;
+    color: #fff; font-size: 26px; font-weight: 700;
+    transition: transform .12s ease, box-shadow .12s ease, background .2s;
+  }
+  .big-btn svg { width: 38px; height: 38px; }
+  .big-btn.in { background: var(--green); box-shadow: 0 10px 0 var(--green-dark), 0 18px 34px rgba(34,168,110,.35); }
+  .big-btn.out { background: var(--coral); box-shadow: 0 10px 0 var(--coral-dark), 0 18px 34px rgba(240,100,90,.35); }
+  .big-btn:active:not(:disabled) { transform: translateY(8px); box-shadow: 0 2px 0 rgba(0,0,0,.15); }
+  .big-btn:disabled { opacity: .75; }
+  .big-btn .small { font-size: 15px; font-weight: 600; opacity: .9; }
+  .sub { color: var(--muted); font-size: 15px; margin-top: 14px; min-height: 20px; }
+
+  /* Parent's live ring (read-only version of the big button) */
+  .ring {
+    width: 200px; height: 200px; border-radius: 50%; margin: 14px auto 2px;
+    display: grid; place-items: center; align-content: center; gap: 4px; position: relative;
+    background: var(--soft); color: var(--muted);
+  }
+  .ring svg { width: 64px; height: 64px; opacity: .55; }
+  .ring .ring-label { font-size: 17px; font-weight: 700; }
+  .ring.on { background: var(--green-soft); color: var(--green-dark); }
+  .ring.on::before {
+    content: ""; position: absolute; inset: -6px; border-radius: 50%;
+    border: 3px solid var(--green); opacity: 0; animation: ripple 2s ease-out infinite;
+  }
+  @keyframes ripple { 0% { transform: scale(.94); opacity: .55; } 100% { transform: scale(1.12); opacity: 0; } }
+  .ring .timer { margin: 0; font-size: 40px; color: var(--ink); }
+  .ring .since { font-size: 14px; font-weight: 600; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+  .stat { background: var(--card); border-radius: 20px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .stat.wide { grid-column: span 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--gold); }
+  .stat .label { font-size: 14px; color: var(--muted); font-weight: 600; }
+  .stat .value { font-size: 24px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .stat.wide .value { font-size: 32px; }
+  .stat .hint { font-size: 14px; color: var(--muted); margin-top: 2px; }
+  .stat.wide .right { text-align: right; display: grid; justify-items: end; gap: 6px; }
+  .pay-pill {
+    background: var(--green); color: #fff; font-weight: 700; font-size: 15px;
+    padding: 9px 14px; border-radius: 99px; white-space: nowrap;
+  }
+  .pay-pill:active { opacity: .75; }
+
+  /* Tabs + lists */
+  .tabs { display: flex; background: var(--soft); border-radius: 14px; padding: 4px; margin: 22px 0 12px; }
+  .tabs button { flex: 1; padding: 10px; border-radius: 11px; font-weight: 600; font-size: 16px; color: var(--muted); }
+  .tabs button.active { background: var(--card); color: var(--ink); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+
+  .list { background: var(--card); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; width: 100%; text-align: left; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row:active { background: var(--soft); }
+  .row .main { flex: 1; min-width: 0; }
+  .row .t1 { font-weight: 600; font-size: 16px; }
+  .row .t2 { color: var(--muted); font-size: 14px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .amt { text-align: right; font-variant-numeric: tabular-nums; }
+  .row .amt .t1 { font-weight: 700; }
+  .pill { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--green-soft); color: var(--green-dark); }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: var(--soft); color: var(--muted); margin-left: 6px; vertical-align: 1px; }
+  .empty { padding: 26px 18px; text-align: center; color: var(--muted); font-size: 15px; line-height: 1.4; }
+  .more { display: block; width: 100%; padding: 13px; color: var(--muted); font-weight: 600; border-top: 1px solid var(--line); }
+
+  .add-btn {
+    display: block; width: 100%; margin-top: 12px; padding: 15px;
+    border-radius: 16px; border: 2px dashed var(--line); color: var(--muted); font-weight: 600; font-size: 16px;
+  }
+  .add-btn.primary { border: 0; background: var(--green); color: #fff; margin: 0 0 12px; }
+  .add-btn:active { opacity: .7; }
+
+  /* Bottom sheet */
+  .backdrop {
+    position: fixed; inset: 0; background: rgba(30, 20, 15, .38); z-index: 20;
+    display: flex; align-items: flex-end; justify-content: center;
+    animation: fade .18s ease;
+  }
+  .sheet {
+    background: var(--bg); width: 100%; max-width: 480px; max-height: 92vh; overflow: auto;
+    border-radius: 26px 26px 0 0; padding: 10px 20px calc(env(safe-area-inset-bottom) + 20px);
+    animation: up .24s cubic-bezier(.2,.9,.3,1);
+    -webkit-user-select: text; user-select: text;
+  }
+  .grabber { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 14px; }
+  .sheet h2 { margin: 0 0 16px; font-size: 22px; }
+  .sheet p { color: var(--muted); line-height: 1.45; margin: 0 0 14px; font-size: 15px; }
+  @keyframes up { from { transform: translateY(100%); } }
+  @keyframes fade { from { opacity: 0; } }
+
+  .detail { background: var(--card); border-radius: 16px; padding: 4px 16px; margin-bottom: 14px; }
+  .detail div { display: flex; justify-content: space-between; gap: 14px; padding: 12px 0; font-size: 16px; }
+  .detail div + div { border-top: 1px solid var(--line); }
+  .detail span { color: var(--muted); }
+  .detail b { text-align: right; font-variant-numeric: tabular-nums; }
+
+  label.field { display: block; margin-bottom: 14px; }
+  label.field span { display: block; font-size: 14px; font-weight: 600; color: var(--muted); margin: 0 0 6px 4px; }
+  input, textarea {
+    width: 100%; font: inherit; font-size: 17px; color: var(--ink);
+    background: var(--card); border: 1.5px solid var(--line); border-radius: 14px;
+    padding: 13px 14px; -webkit-appearance: none; appearance: none; min-height: 50px;
+  }
+  textarea { min-height: 84px; resize: none; font-size: 15px; }
+  input:focus, textarea:focus { outline: none; border-color: var(--green); }
+  .money { position: relative; }
+  .money::before { content: "$"; position: absolute; left: 15px; top: 50%; transform: translateY(-50%); font-size: 20px; font-weight: 700; color: var(--muted); }
+  .money input { padding-left: 32px; font-size: 22px; font-weight: 700; }
+  .btns { display: flex; gap: 10px; margin-top: 6px; }
+  .btn { flex: 1; padding: 15px; border-radius: 14px; font-weight: 700; font-size: 17px; background: var(--soft); text-align: center; text-decoration: none; color: var(--ink); }
+  .btn.go { background: var(--green); color: #fff; }
+  .btn.danger { background: transparent; color: var(--coral); }
+  .btn.danger.armed { background: var(--coral); color: #fff; }
+  .btn:disabled { opacity: .6; }
+  .err { color: var(--coral); font-size: 15px; font-weight: 600; min-height: 20px; margin: -4px 0 8px 4px; }
+  .link { color: var(--green-dark); font-weight: 600; text-decoration: none; }
+  .settings-row { display: flex; justify-content: space-between; padding: 14px 16px; background: var(--card); border-radius: 14px; margin-bottom: 10px; font-size: 16px; }
+  .settings-row b { font-variant-numeric: tabular-nums; }
+
+  /* Toast */
+  .toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 22px); z-index: 30;
+    transform: translateX(-50%); width: max-content; max-width: calc(100% - 36px);
+    background: var(--ink); color: var(--bg); font-weight: 600; font-size: 15px;
+    padding: 13px 18px; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.25);
+    animation: fade .2s ease;
+  }
+  .toast.bad { background: var(--coral); color: #fff; }
+
+  /* Connect screen */
+  .connect { text-align: center; padding-top: 10vh; }
+  .connect img { width: 96px; height: 96px; border-radius: 22px; box-shadow: var(--shadow); }
+  .connect h1 { font-size: 28px; margin: 18px 0 8px; }
+  .connect p { color: var(--muted); line-height: 1.5; margin: 0 auto 22px; max-width: 320px; }
+  .connect textarea { text-align: left; }
+  .connect .demo { margin-top: 18px; color: var(--muted); font-size: 15px; line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<!-- Main screen -->
+<div class="wrap" id="main" hidden>
+  <header>
+    <div class="titles">
+      <div class="hello" id="greeting">Hi!</div>
+      <div class="today" id="today"></div>
+    </div>
+    <button class="icon-btn" id="refreshBtn" aria-label="Refresh">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
+    </button>
+    <button class="icon-btn" id="settingsBtn" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+    </button>
+  </header>
+
+  <!-- Sitter: clock in/out -->
+  <section class="clock-card" id="sitterCard" hidden>
+    <div class="status" id="status">You're off the clock</div>
+    <div class="timer" id="timer" hidden>0:00:00</div>
+    <button class="big-btn in" id="clockBtn"></button>
+    <div class="sub" id="sub"></div>
+  </section>
+
+  <!-- Parent: live status -->
+  <section class="clock-card" id="parentCard" hidden>
+    <div class="status" id="pStatus"></div>
+    <div class="ring" id="ring"></div>
+  </section>
+
+  <section class="stats">
+    <div class="stat wide">
+      <div>
+        <div class="label" id="owedLabel">Still owed to you</div>
+        <div class="value" id="owed">$0</div>
+        <div class="hint" id="owedHrs"></div>
+      </div>
+      <div class="right">
+        <button class="pay-pill" id="payPill" hidden></button>
+      </div>
+    </div>
+    <div class="stat">
+      <div class="label">This week</div>
+      <div class="value" id="week">0h</div>
+    </div>
+    <div class="stat">
+      <div class="label">Paid so far</div>
+      <div class="value" id="paid">$0</div>
+    </div>
+  </section>
+
+  <nav class="tabs">
+    <button data-tab="shifts" class="active">Shifts</button>
+    <button data-tab="payments">Payments</button>
+  </nav>
+
+  <section id="shiftsPanel">
+    <div class="list" id="shiftList"></div>
+    <button class="add-btn" id="addShiftBtn">+ Add a shift I forgot</button>
+  </section>
+
+  <section id="paymentsPanel" hidden>
+    <button class="add-btn primary" id="addPayBtn"></button>
+    <div class="list" id="payList"></div>
+  </section>
+</div>
+
+<!-- First-run connect screen -->
+<div class="wrap connect" id="connect" hidden>
+  <img src="icons/apple-touch-icon.png" alt="">
+  <h1>Welcome!</h1>
+  <p id="connectMsg">Paste the link you were sent to get started.</p>
+  <textarea id="linkInput" placeholder="https://…#api=…&amp;key=…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+  <div class="err" id="connectErr"></div>
+  <button class="btn go" id="connectBtn" style="width:100%">Connect</button>
+  <div class="demo">Just looking? Try the demo as the<br>
+    <a href="#" class="link" data-demo="sitter">sitter</a> or the <a href="#" class="link" data-demo="parent">parent</a></div>
+</div>
+
+<div class="backdrop" id="backdrop" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+'use strict';
+
+/* ================================================================== */
+/* Storage + config                                                    */
+/* ================================================================== */
+
+const KEY_CONN = 'sh.conn';    // { api, key } or { demo: 'sitter' | 'parent' }
+const KEY_HASH = 'sh.lastHash';
+const KEY_STATE = 'sh.state';
+
+/** Pull {api, key} out of a link like  https://…/#api=<web app url>&key=<secret>  */
+function parseLink(text) {
+  const hash = String(text || '').split('#')[1] || '';
+  const params = {};
+  hash.split('&').forEach((part) => {
+    const i = part.indexOf('=');
+    if (i > 0) params[part.slice(0, i)] = decodeURIComponent(part.slice(i + 1));
+  });
+  return params.api && params.key ? { api: params.api, key: params.key } : null;
+}
+
+// Opening a personal link sets up the connection automatically.
+(function readHash() {
+  const conn = parseLink(location.href);
+  if (conn && location.hash !== localStorage.getItem(KEY_HASH)) {
+    localStorage.setItem(KEY_CONN, JSON.stringify(conn));
+    localStorage.setItem(KEY_HASH, location.hash);
+    localStorage.removeItem(KEY_STATE);
+  }
+})();
+
+const load = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+let conn = load(KEY_CONN);
+let state = load(KEY_STATE);
+let busy = false;
+let tab = 'shifts';
+let showAllShifts = false;
+
+const isParent = () => (state ? state.role === 'parent' : conn && conn.demo === 'parent');
+const sitterName = () => (state && state.sitterName) || '';
+
+/* ================================================================== */
+/* Backend                                                             */
+/* ================================================================== */
+
+async function call(action, data) {
+  if (!conn) throw new Error('Not connected.');
+  if (conn.demo) return demo(conn.demo, action, data || {});
+  let res;
+  try {
+    if (action === 'state') {
+      res = await fetch(`${conn.api}?key=${encodeURIComponent(conn.key)}&t=${Date.now()}`);
+    } else {
+      res = await fetch(conn.api, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(Object.assign({ action, key: conn.key }, data)),
+      });
+    }
+  } catch (e) {
+    throw new Error(navigator.onLine === false
+      ? "You're offline. Try again when you have signal."
+      : "Couldn't reach the spreadsheet. Try again in a moment.");
+  }
+  let json;
+  try { json = await res.json(); } catch (e) {
+    throw new Error('The spreadsheet sent back something unexpected. Check the link.');
+  }
+  if (!json.ok) {
+    const err = new Error(json.error || 'Something went wrong.');
+    err.code = json.code;
+    throw err;
+  }
+  return json.state;
+}
+
+function setState(s) {
+  const prev = state;
+  state = s;
+  localStorage.setItem(KEY_STATE, JSON.stringify(s));
+  // Let the sitter know when the parent logs a payment.
+  if (prev && s.role === 'sitter' && prev.role === 'sitter') {
+    const seen = new Set(prev.payments.map((p) => p.id));
+    const fresh = s.payments.filter((p) => !seen.has(p.id) && p.by === 'Parent');
+    if (fresh.length) toast(`💸 The parent logged a ${money(fresh[0].amount)} payment`);
+  }
+  render();
+}
+
+function handleError(e) {
+  if (e.code === 'auth') {
+    disconnect(e.message);
+  } else {
+    toast(e.message, true);
+  }
+}
+
+async function refresh(quiet) {
+  if (!conn) return;
+  const btn = $('refreshBtn');
+  btn.classList.add('spin');
+  try {
+    setState(await call('state'));
+  } catch (e) {
+    if (e.code === 'auth' || !quiet || !state) handleError(e);
+  } finally {
+    btn.classList.remove('spin');
+  }
+}
+
+/** Run a change, show a message, and keep the screen in sync. */
+async function act(action, data, okMessage) {
+  try {
+    const s = await call(action, data);
+    setState(s);
+    if (okMessage) toast(typeof okMessage === 'function' ? okMessage(s) : okMessage);
+    return s;
+  } catch (e) {
+    if (e.code === 'auth') { closeSheet(); handleError(e); }
+    throw e;
+  }
+}
+
+function disconnect(message) {
+  localStorage.removeItem(KEY_CONN);
+  localStorage.removeItem(KEY_STATE);
+  conn = null; state = null;
+  $('connectMsg').textContent = message || 'Paste the link you were sent to get started.';
+  closeSheet();
+  render();
+}
+
+/* ================================================================== */
+/* Formatting                                                          */
+/* ================================================================== */
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function money(n) {
+  const v = Math.abs(n) < 0.005 ? 0 : n;
+  return (v < 0 ? '-$' : '$') + Math.abs(v).toLocaleString('en-US', {
+    minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2,
+  });
+}
+function dur(hours) {
+  const mins = Math.round(hours * 60);
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if (!h) return m + 'm';
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+const time = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+function dayLabel(d) {
+  const diff = Math.round((startOfDay(new Date()) - startOfDay(d)) / 864e5);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+const longDate = (d) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+function startOfWeek() { const d = startOfDay(new Date()); d.setDate(d.getDate() - d.getDay()); return d; }
+
+// <input type="datetime-local"> and <input type="date"> helpers (local time)
+const pad = (n) => String(n).padStart(2, '0');
+const toLocalInput = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const toDateInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+function fromLocalInput(v) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(v || '');
+  return m ? new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5]).getTime() : null;
+}
+function fromDateKey(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); }
+
+/** Who added a payment, from the viewer's point of view. */
+function byLabel(by) {
+  if (!by) return '';
+  const mine = (by === 'Parent') === isParent();
+  if (mine) return 'you';
+  return by === 'Parent' ? 'parent' : (sitterName() || 'sitter');
+}
+const canDeletePayment = (p) => !isParent() || p.by === 'Parent';
+
+/* ================================================================== */
+/* Rendering                                                           */
+/* ================================================================== */
+
+const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
+const ICON_STOP = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>';
+const ICON_MOON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a.6.6 0 0 0-.8-.7A9.5 9.5 0 1 0 21.2 15.4a.6.6 0 0 0-.7-.8z"/></svg>';
+
+function render() {
+  $('main').hidden = !conn;
+  $('connect').hidden = !!conn;
+  if (!conn) return;
+
+  const parent = isParent();
+  const name = sitterName();
+  const h = new Date().getHours();
+  const hi = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  $('greeting').textContent = parent ? (name ? `${name}'s hours` : 'Babysitting hours') : `${hi}${name ? ', ' + name : ''}!`;
+  $('today').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  $('sitterCard').hidden = parent;
+  $('parentCard').hidden = !parent;
+  $('addShiftBtn').hidden = parent;
+
+  if (!state) {
+    $('clockBtn').innerHTML = '<span class="small">Loading…</span>';
+    $('clockBtn').disabled = true;
+    $('ring').innerHTML = '<span class="ring-label">Loading…</span>';
+    $('shiftList').innerHTML = '<div class="empty">Loading…</div>';
+    $('payList').innerHTML = '';
+    return;
+  }
+
+  const open = state.open;
+  const last = state.shifts.find((s) => s.out);
+  const lastText = last ? `Last shift: ${dayLabel(new Date(last.in))}, ${dur(last.hours)}` : '';
+
+  if (parent) {
+    const who = name || 'Your sitter';
+    $('pStatus').className = 'status' + (open ? ' on' : '');
+    $('pStatus').innerHTML = open ? `<span class="dot"></span>${esc(who)} is on the clock` : `${esc(who)} is off the clock`;
+    $('ring').className = 'ring' + (open ? ' on' : '');
+    $('ring').innerHTML = open
+      ? `<div class="timer" id="pTimer">0:00:00</div><div class="since">since ${time(open.in)}</div>`
+      : ICON_MOON;
+  } else {
+    const btn = $('clockBtn');
+    if (!busy) {
+      btn.disabled = false;
+      btn.className = 'big-btn ' + (open ? 'out' : 'in');
+      btn.innerHTML = (open ? ICON_STOP : ICON_PLAY) + `<span>${open ? 'Clock Out' : 'Clock In'}</span>`;
+    }
+    $('status').className = 'status' + (open ? ' on' : '');
+    $('status').innerHTML = open ? `<span class="dot"></span>On the clock since ${time(open.in)}` : "You're off the clock";
+    $('timer').hidden = !open;
+    $('sub').textContent = open ? 'Tap Clock Out when you leave.' : (lastText || 'Tap Clock In when you start.');
+  }
+  tick();
+
+  // Money
+  const t = state.totals;
+  const ahead = t.owed < -0.004;
+  $('owedLabel').textContent = ahead ? 'Paid ahead by' : parent ? 'You owe' : 'Still owed to you';
+  $('owed').textContent = money(Math.abs(t.owed));
+  $('owedHrs').textContent = !ahead && state.rate > 0 && t.owed > 0.004
+    ? `for ${dur(t.owed / state.rate)} of babysitting`
+    : (Math.abs(t.owed) < 0.005 && t.hours > 0 ? 'All caught up 🎉' : '');
+  $('payPill').hidden = !(t.owed > 0.004);
+  $('payPill').textContent = parent ? 'I paid' : 'Got paid?';
+  $('addPayBtn').textContent = parent ? '+ I paid' : '+ I got paid';
+
+  const weekStart = startOfWeek().getTime();
+  const week = state.shifts.filter((s) => s.out && s.in >= weekStart).reduce((a, s) => a + s.hours, 0);
+  $('week').textContent = dur(week);
+  $('paid').textContent = money(t.paid);
+
+  // Shifts
+  const shifts = showAllShifts ? state.shifts : state.shifts.slice(0, 10);
+  $('shiftList').innerHTML = state.shifts.length ? shifts.map((s) => `
+    <button class="row" data-shift="${esc(s.id)}">
+      <div class="main">
+        <div class="t1">${dayLabel(new Date(s.in))}</div>
+        <div class="t2">${time(s.in)} – ${s.out ? time(s.out) : 'now'}${s.note ? ' · ' + esc(s.note) : ''}</div>
+      </div>
+      <div class="amt">${s.out
+        ? `<div class="t1">${dur(s.hours)}</div><div class="t2">${money(s.earned)}</div>`
+        : '<span class="pill">In progress</span>'}</div>
+    </button>`).join('') + (state.shifts.length > 10 && !showAllShifts
+      ? `<button class="more" id="moreBtn">Show all ${state.shifts.length} shifts</button>` : '')
+    : `<div class="empty">No shifts yet.${parent ? '' : '<br>Tap <b>Clock In</b> when you start!'}</div>`;
+
+  // Payments
+  $('payList').innerHTML = state.payments.length ? state.payments.map((p) => {
+    const by = byLabel(p.by);
+    return `
+    <button class="row" data-pay="${esc(p.id)}">
+      <div class="main">
+        <div class="t1">${dayLabel(fromDateKey(p.date))}${by ? `<span class="tag">by ${esc(by)}</span>` : ''}</div>
+        ${p.note ? `<div class="t2">${esc(p.note)}</div>` : ''}
+      </div>
+      <div class="amt"><div class="t1">${money(p.amount)}</div></div>
+    </button>`;
+  }).join('') : '<div class="empty">No payments recorded yet.</div>';
+
+  $('shiftsPanel').hidden = tab !== 'shifts';
+  $('paymentsPanel').hidden = tab !== 'payments';
+  document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+}
+
+function tick() {
+  if (!state || !state.open) return;
+  const secs = Math.max(0, Math.floor((Date.now() - state.open.in) / 1000));
+  const h = Math.floor(secs / 3600), m = Math.floor(secs / 60) % 60, s = secs % 60;
+  ['timer', 'pTimer'].forEach((id) => { const el = $(id); if (el) el.textContent = `${h}:${pad(m)}:${pad(s)}`; });
+}
+setInterval(tick, 1000);
+
+/* ================================================================== */
+/* Clock in / out (sitter)                                             */
+/* ================================================================== */
+
+$('clockBtn').addEventListener('click', async () => {
+  if (busy || !state || isParent()) return;
+  const clockingIn = !state.open;
+  busy = true;
+  const btn = $('clockBtn');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="small">${clockingIn ? 'Clocking in…' : 'Clocking out…'}</span>`;
+  try {
+    await act(clockingIn ? 'clockIn' : 'clockOut', {}, (s) => {
+      if (clockingIn) return 'Clocked in. Have a great shift! ☀️';
+      const done = s.shifts.find((x) => x.out);
+      return done ? `Nice work! ${dur(done.hours)} logged 👏` : 'Clocked out!';
+    });
+    if (navigator.vibrate) navigator.vibrate(25);
+  } catch (e) {
+    if (e.code !== 'auth') { toast(e.message, true); refresh(true); }
+  } finally {
+    busy = false;
+    render();
+  }
+});
+
+/* ================================================================== */
+/* Bottom sheets                                                       */
+/* ================================================================== */
+
+function openSheet(html, onReady) {
+  $('sheet').innerHTML = '<div class="grabber"></div>' + html;
+  $('backdrop').hidden = false;
+  if (onReady) onReady($('sheet'));
+}
+function closeSheet() { $('backdrop').hidden = true; $('sheet').innerHTML = ''; }
+$('backdrop').addEventListener('click', (e) => { if (e.target === $('backdrop')) closeSheet(); });
+
+/** Wire up a form inside the sheet: disables buttons while saving and shows errors. */
+function wireSave(sheet, btnSel, work) {
+  const btn = sheet.querySelector(btnSel);
+  btn.addEventListener('click', async () => {
+    const err = sheet.querySelector('.err');
+    err.textContent = '';
+    const all = sheet.querySelectorAll('.btn');
+    all.forEach((b) => (b.disabled = true));
+    const label = btn.textContent;
+    btn.textContent = 'Saving…';
+    try {
+      await work();
+      closeSheet();
+    } catch (e) {
+      if (e.code === 'auth') return;
+      err.textContent = e.message;
+      all.forEach((b) => (b.disabled = false));
+      btn.textContent = label;
+    }
+  });
+}
+
+/** Delete buttons need a second tap to confirm. */
+function wireDelete(sheet, work) {
+  const btn = sheet.querySelector('.danger');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    if (!btn.classList.contains('armed')) {
+      btn.classList.add('armed');
+      btn.textContent = 'Tap again to delete';
+      setTimeout(() => { btn.classList.remove('armed'); btn.textContent = 'Delete'; }, 3000);
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+    try { await work(); closeSheet(); }
+    catch (e) {
+      if (e.code === 'auth') return;
+      sheet.querySelector('.err').textContent = e.message; btn.disabled = false; btn.textContent = 'Delete';
+    }
+  });
+}
+
+function shiftSheet(shift) {
+  const isNew = !shift;
+  const now = Date.now();
+  const start = shift ? shift.in : now - 3 * 36e5;
+  const end = shift ? shift.out : now;
+  openSheet(`
+    <h2>${isNew ? 'Add a shift' : shift.out ? 'Edit shift' : 'Shift in progress'}</h2>
+    ${isNew ? '<p>Forgot to clock in? Add the shift here.</p>' : ''}
+    <label class="field"><span>Started</span><input type="datetime-local" id="fIn" value="${toLocalInput(start)}"></label>
+    <label class="field"><span>Ended${shift && !shift.out ? " (leave blank if you're still there)" : ''}</span>
+      <input type="datetime-local" id="fOut" value="${end ? toLocalInput(end) : ''}"></label>
+    <label class="field"><span>Note (the parent can see this)</span><textarea id="fNote" placeholder="e.g. stayed late, drove to soccer">${esc(shift ? shift.note : '')}</textarea></label>
+    <div class="err"></div>
+    <div class="btns"><button class="btn" id="fCancel">Cancel</button><button class="btn go" id="fSave">Save</button></div>
+    ${isNew ? '' : '<div class="btns"><button class="btn danger">Delete</button></div>'}
+  `, (sheet) => {
+    $('fCancel').onclick = closeSheet;
+    wireSave(sheet, '#fSave', async () => {
+      const inMs = fromLocalInput($('fIn').value);
+      const outMs = fromLocalInput($('fOut').value);
+      if (!inMs) throw new Error('Please pick a start time.');
+      if (isNew && !outMs) throw new Error('Please pick an end time.');
+      if (outMs && outMs <= inMs) throw new Error('The end time has to be after the start time.');
+      await act('saveShift', { id: shift && shift.id, in: inMs, out: outMs, note: $('fNote').value }, isNew ? 'Shift added' : 'Shift updated');
+    });
+    if (!isNew) wireDelete(sheet, () => act('deleteShift', { id: shift.id }, 'Shift deleted'));
+  });
+}
+
+/** Read-only shift details for the parent. */
+function shiftDetail(s) {
+  openSheet(`
+    <h2>${longDate(new Date(s.in))}</h2>
+    <div class="detail">
+      <div><span>Started</span><b>${time(s.in)}</b></div>
+      <div><span>Ended</span><b>${s.out ? time(s.out) : 'Still there'}</b></div>
+      ${s.out ? `<div><span>Hours</span><b>${dur(s.hours)}</b></div>
+      <div><span>Earned</span><b>${money(s.earned)}${s.rate ? ` <span>at ${money(s.rate)}/hr</span>` : ''}</b></div>` : ''}
+      ${s.note ? `<div><span>Note</span><b>${esc(s.note)}</b></div>` : ''}
+    </div>
+    <div class="btns"><button class="btn" id="dClose">Close</button></div>
+  `, () => { $('dClose').onclick = closeSheet; });
+}
+
+function paymentSheet() {
+  const parent = isParent();
+  const owed = state ? state.totals.owed : 0;
+  openSheet(`
+    <h2>${parent ? 'Log a payment 💸' : 'I got paid 💸'}</h2>
+    <label class="field"><span>Amount</span><div class="money"><input id="pAmt" type="text" inputmode="decimal" placeholder="0" autocomplete="off"></div></label>
+    <label class="field"><span>Date</span><input id="pDate" type="date" value="${toDateInput(new Date())}"></label>
+    <label class="field"><span>Note (optional)</span><input id="pNote" type="text" placeholder="e.g. Venmo, cash"></label>
+    ${owed > 0 ? `<p>${parent ? 'You owe' : "You're owed"} <b>${money(owed)}</b>. <a href="#" class="link" id="pAll">Fill that in</a></p>` : ''}
+    <div class="err"></div>
+    <div class="btns"><button class="btn" id="pCancel">Cancel</button><button class="btn go" id="pSave">Save</button></div>
+  `, (sheet) => {
+    $('pCancel').onclick = closeSheet;
+    if ($('pAll')) $('pAll').onclick = (e) => { e.preventDefault(); $('pAmt').value = owed.toFixed(2); };
+    setTimeout(() => $('pAmt').focus(), 250);
+    wireSave(sheet, '#pSave', async () => {
+      const amount = parseFloat(($('pAmt').value || '').replace(/[^0-9.]/g, ''));
+      if (!(amount > 0)) throw new Error('Please enter an amount.');
+      if (!$('pDate').value) throw new Error('Please pick a date.');
+      await act('addPayment', { amount, date: $('pDate').value, note: $('pNote').value },
+        parent ? `${money(amount)} payment logged. Thank you!` : `${money(amount)} payment saved`);
+    });
+  });
+}
+
+function paymentDetail(p) {
+  const by = byLabel(p.by);
+  openSheet(`
+    <h2>${money(p.amount)}</h2>
+    <div class="detail">
+      <div><span>Paid</span><b>${longDate(fromDateKey(p.date))}</b></div>
+      ${by ? `<div><span>Added by</span><b>${esc(by[0].toUpperCase() + by.slice(1))}</b></div>` : ''}
+      ${p.note ? `<div><span>Note</span><b>${esc(p.note)}</b></div>` : ''}
+    </div>
+    <div class="err"></div>
+    <div class="btns"><button class="btn" id="dClose">Close</button></div>
+    ${canDeletePayment(p) ? '<div class="btns"><button class="btn danger">Delete</button></div>' : ''}
+  `, (sheet) => {
+    $('dClose').onclick = closeSheet;
+    wireDelete(sheet, () => act('deletePayment', { id: p.id }, 'Payment deleted'));
+  });
+}
+
+function settingsSheet() {
+  const parent = isParent();
+  const demoMode = conn && conn.demo;
+  openSheet(`
+    <h2>Settings</h2>
+    ${state ? `<div class="settings-row"><span>Hourly rate</span><b>${money(state.rate)}/hr</b></div>
+      <div class="settings-row"><span>Total hours so far</span><b>${dur(state.totals.hours)}</b></div>
+      ${parent
+        ? `<div class="settings-row"><span>Total paid</span><b>${money(state.totals.paid)}</b></div>`
+        : `<div class="settings-row"><span>Total earned</span><b>${money(state.totals.earned)}</b></div>`}
+      ${parent ? '' : '<p>To change the rate or your name, edit the yellow cells on the <b>Summary</b> tab of the spreadsheet. New shifts use the new rate.</p>'}` : ''}
+    ${state && state.sheetUrl ? `<a class="btn go" style="display:block;margin-bottom:10px" href="${esc(state.sheetUrl)}" target="_blank" rel="noopener">Open the spreadsheet</a>` : ''}
+    ${demoMode ? `<p>You're in <b>demo mode</b> (${parent ? 'parent' : 'sitter'} view). Nothing here is saved to a real spreadsheet.</p>
+      <div class="btns"><button class="btn go" id="sSwitch">Switch to the ${parent ? 'sitter' : 'parent'} view</button></div>` : ''}
+    <div class="btns"><button class="btn" id="sClose">Close</button></div>
+    <div class="btns"><button class="btn danger" id="sDisconnect">${demoMode ? 'Leave demo' : 'Disconnect this phone'}</button></div>
+  `, () => {
+    $('sClose').onclick = closeSheet;
+    if ($('sSwitch')) $('sSwitch').onclick = () => startDemo(parent ? 'sitter' : 'parent');
+    $('sDisconnect').onclick = () => {
+      if (!demoMode && !confirm("Disconnect this phone? You'll need your link to connect again. Nothing in the spreadsheet is deleted.")) return;
+      disconnect();
+    };
+  });
+}
+
+/* ================================================================== */
+/* Events                                                              */
+/* ================================================================== */
+
+$('refreshBtn').onclick = () => refresh(false);
+$('settingsBtn').onclick = settingsSheet;
+$('addShiftBtn').onclick = () => shiftSheet(null);
+$('addPayBtn').onclick = paymentSheet;
+$('payPill').onclick = paymentSheet;
+document.querySelectorAll('.tabs button').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; render(); }));
+$('shiftList').addEventListener('click', (e) => {
+  if (e.target.closest('#moreBtn')) { showAllShifts = true; render(); return; }
+  const row = e.target.closest('[data-shift]');
+  if (!row) return;
+  const s = state.shifts.find((x) => x.id === row.dataset.shift);
+  if (s) (isParent() ? shiftDetail : shiftSheet)(s);
+});
+$('payList').addEventListener('click', (e) => {
+  const row = e.target.closest('[data-pay]');
+  const p = row && state.payments.find((x) => x.id === row.dataset.pay);
+  if (p) paymentDetail(p);
+});
+
+$('connectBtn').onclick = async () => {
+  const text = $('linkInput').value.trim();
+  $('connectErr').textContent = '';
+  const c = parseLink(text);
+  if (!c) {
+    $('connectErr').textContent = "That link isn't complete. Copy the whole thing and paste it again.";
+    return;
+  }
+  const btn = $('connectBtn');
+  btn.disabled = true; btn.textContent = 'Connecting…';
+  conn = c;
+  try {
+    const s = await call('state');
+    localStorage.setItem(KEY_CONN, JSON.stringify(c));
+    setState(s);
+    toast('Connected! 🎉');
+  } catch (e) {
+    conn = null;
+    $('connectErr').textContent = e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Connect';
+  }
+};
+
+function startDemo(role) {
+  conn = { demo: role };
+  state = null;
+  localStorage.setItem(KEY_CONN, JSON.stringify(conn));
+  localStorage.removeItem(KEY_STATE);
+  closeSheet();
+  render();
+  refresh(true);
+}
+document.querySelectorAll('[data-demo]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); startDemo(a.dataset.demo); }));
+
+// Stay fresh: refresh when the app comes back to the front, and every minute while open.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { render(); refresh(true); } });
+setInterval(() => {
+  if (!document.hidden && !busy && $('backdrop').hidden) refresh(true);
+}, 60000);
+
+let toastTimer;
+function toast(msg, bad) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (bad ? ' bad' : '');
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.hidden = true), bad ? 4500 : 2600);
+}
+
+/* ================================================================== */
+/* Demo mode: a pretend spreadsheet stored on this device only.        */
+/* Follows the same rules as the real one (the parent can't edit).     */
+/* ================================================================== */
+
+const KEY_DEMO = 'sh.demo2';
+function demoDb() {
+  const saved = load(KEY_DEMO);
+  if (saved) return saved;
+  const day = (n, h, m) => { const d = startOfDay(new Date()); d.setDate(d.getDate() - n); d.setHours(h, m); return d.getTime(); };
+  return {
+    rate: 25,
+    shifts: [
+      { id: 'd1', in: day(9, 15, 0), out: day(9, 19, 30), rate: 25, note: '' },
+      { id: 'd2', in: day(7, 8, 0), out: day(7, 12, 15), rate: 25, note: 'Park + lunch' },
+      { id: 'd3', in: day(5, 15, 30), out: day(5, 20, 0), rate: 25, note: '' },
+      { id: 'd4', in: day(2, 16, 0), out: day(2, 21, 45), rate: 25, note: 'Stayed for bedtime' },
+      { id: 'd5', in: day(1, 15, 0), out: day(1, 18, 30), rate: 25, note: '' },
+    ],
+    payments: [{ id: 'p1', date: toDateInput(new Date(day(6, 12, 0))), amount: 200, note: 'Venmo', by: 'Parent' }],
+  };
+}
+async function demo(role, action, req) {
+  await new Promise((r) => setTimeout(r, 450));
+  const db = demoDb();
+  const open = db.shifts.find((s) => !s.out);
+  const id = () => Math.random().toString(36).slice(2, 10);
+  if (role === 'parent' && !['state', 'addPayment', 'deletePayment'].includes(action)) {
+    throw new Error("The parent view can't do that.");
+  }
+  if (action === 'clockIn') {
+    if (open) throw new Error("You're already clocked in.");
+    db.shifts.push({ id: id(), in: Date.now(), out: null, rate: db.rate, note: '' });
+  } else if (action === 'clockOut') {
+    if (!open) throw new Error("You're not clocked in right now.");
+    open.out = Date.now();
+  } else if (action === 'saveShift') {
+    if (!req.out && open && open.id !== req.id) throw new Error('You already have a shift in progress.');
+    const s = req.id ? db.shifts.find((x) => x.id === req.id) : { id: id(), rate: db.rate };
+    Object.assign(s, { in: req.in, out: req.out || null, note: req.note || '' });
+    if (!req.id) db.shifts.push(s);
+  } else if (action === 'deleteShift') {
+    db.shifts = db.shifts.filter((x) => x.id !== req.id);
+  } else if (action === 'addPayment') {
+    db.payments.push({ id: id(), date: req.date, amount: Math.round(req.amount * 100) / 100, note: req.note || '', by: role === 'parent' ? 'Parent' : 'Sitter' });
+  } else if (action === 'deletePayment') {
+    const p = db.payments.find((x) => x.id === req.id);
+    if (role === 'parent' && p && p.by !== 'Parent') throw new Error('You can only delete payments you added.');
+    db.payments = db.payments.filter((x) => x.id !== req.id);
+  }
+  localStorage.setItem(KEY_DEMO, JSON.stringify(db));
+
+  const r2 = (n) => Math.round(n * 100) / 100;
+  const shifts = db.shifts.map((s) => {
+    const hours = s.out ? r2((s.out - s.in) / 36e5) : 0;
+    return Object.assign({}, s, { hours, earned: r2(hours * s.rate) });
+  }).sort((a, b) => b.in - a.in);
+  const payments = db.payments.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+  const earned = shifts.reduce((a, s) => a + s.earned, 0);
+  const paid = payments.reduce((a, p) => a + p.amount, 0);
+  const o = shifts.find((s) => !s.out);
+  return {
+    role, sitterName: 'Katarina', rate: db.rate,
+    open: o ? { id: o.id, in: o.in } : null,
+    totals: { hours: r2(shifts.reduce((a, s) => a + s.hours, 0)), earned: r2(earned), paid: r2(paid), owed: r2(earned - paid) },
+    shifts, payments, sheetUrl: '',
+  };
+}
+
+/* ================================================================== */
+/* Start                                                               */
+/* ================================================================== */
+
+render();
+refresh(true);
+</script>
+</body>
+</html>

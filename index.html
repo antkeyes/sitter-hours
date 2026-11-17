@@ -124,6 +124,7 @@
   /* Stats */
   .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
   .stat { background: var(--card); border-radius: 20px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .stat.full { grid-column: span 2; }
   .stat.wide { grid-column: span 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--gold); }
   .stat .label { font-size: 14px; color: var(--muted); font-weight: 600; }
   .stat .value { font-size: 24px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
@@ -270,11 +271,11 @@
         <button class="pay-pill" id="payPill" hidden></button>
       </div>
     </div>
-    <div class="stat">
+    <div class="stat" id="weekTile">
       <div class="label">This week</div>
       <div class="value" id="week">0h</div>
     </div>
-    <div class="stat">
+    <div class="stat" id="paidTile">
       <div class="label">Paid so far</div>
       <div class="value" id="paid">$0</div>
     </div>
@@ -516,6 +517,8 @@ function render() {
   $('sitterCard').hidden = parent;
   $('parentCard').hidden = !parent;
   $('addShiftBtn').hidden = parent;
+  $('paidTile').hidden = parent;
+  $('weekTile').classList.toggle('full', parent);
 
   if (!state) {
     $('clockBtn').innerHTML = '<span class="small">Loading…</span>';
@@ -555,7 +558,7 @@ function render() {
   // Money
   const t = state.totals;
   const ahead = t.owed < -0.004;
-  $('owedLabel').textContent = ahead ? 'Paid ahead by' : parent ? 'You owe' : 'Still owed to you';
+  $('owedLabel').textContent = ahead ? 'Paid ahead by' : parent ? 'Balance' : 'Still owed to you';
   $('owed').textContent = money(Math.abs(t.owed));
   $('owedHrs').textContent = !ahead && state.rate > 0 && t.owed > 0.004
     ? `for ${dur(t.owed / state.rate)} of babysitting`
@@ -743,7 +746,7 @@ function paymentSheet() {
     <label class="field"><span>Amount</span><div class="money"><input id="pAmt" type="text" inputmode="decimal" placeholder="0" autocomplete="off"></div></label>
     <label class="field"><span>Date</span><input id="pDate" type="date" value="${toDateInput(new Date())}"></label>
     <label class="field"><span>Note (optional)</span><input id="pNote" type="text" placeholder="e.g. Venmo, cash"></label>
-    ${owed > 0 ? `<p>${parent ? 'You owe' : "You're owed"} <b>${money(owed)}</b>. <a href="#" class="link" id="pAll">Fill that in</a></p>` : ''}
+    ${owed > 0 ? `<p>${parent ? 'Balance:' : "You're owed"} <b>${money(owed)}</b>. <a href="#" class="link" id="pAll">Fill that in</a></p>` : ''}
     <div class="err"></div>
     <div class="btns"><button class="btn" id="pCancel">Cancel</button><button class="btn go" id="pSave">Save</button></div>
   `, (sheet) => {
